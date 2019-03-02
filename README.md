@@ -15,4 +15,6 @@ The file contains a detailed description of how things are done. Here's a sample
     }   
     | v3
 
-This program calculates the v0th Fibonacci number. It is included in the source file, and is named fibonacci. It can be run by typing "`run [n] fibonacci`" in ghci, where n is a nonnegative integer. The source contains a few other samples.
+This program calculates the nth Fibonacci number. It is included in the source file, and is named fibonacci. It can be run by typing "`run [n] fibonacci`" in ghci, where n is a nonnegative integer that will be assigned to `v0` before runtime. After execution, the value of `v3` will be the nth Fibonacci number, so this value is returned. 
+
+The source contains a few more samples.
