@@ -23,7 +23,7 @@ Terms are arithmetic expressions with integers, variables, and the operations
 not supported in the program strings, but can be the values of terms. / is
 integer division: 7/3 is 2.
 
-Terms are paresed in a left-to-right fashion, with standard operator precedence
+Terms are parsed in a left-to-right fashion, with standard operator precedence
 (^ > *,/ > +,-): "11+9-3*2^3+5" is parsed into the same term as
 "((11+(9-(3*(2^3))))+5)".
 
@@ -41,9 +41,9 @@ Whitespace (space, tab, line break) is allowed anywhere in the code, and is
 ignored.
 
 The language is Turing complete. In principle lists and strings can be
-simulated via Gödel encodings, but that is a an unpleasant way to go. in fact,
-if-then-else constructions are even redundant; they can be simulated by a while
-loop, also an unpleasant way to go.
+simulated via Gödel encodings, but that is a an unpleasant way to go. In fact,
+even if-then-else constructs are redundant; they can be simulated by while
+loops (also an unpleasant way to go).
 
 The parser part is ugly. It works, but it has to be rewritten.
 
@@ -127,7 +127,7 @@ divisors =
   \ while v2 <= v0 do {                   \n\
   \   if v0 - (v0 / v2) * v2 == 0         \n\
   \   then {v1 = v1 + 1}                  \n\
-  \   else {v1=v1};                       \n\
+  \   else {v1 = v1};                     \n\
   \   v2 = v2 + 1                         \n\
   \ }                                     \n\
   \ | v1"
@@ -161,7 +161,8 @@ test =
   run [120,72] gcd' == [24] &&
   run [30] divisors == [8] &&
   run [2019] primecheck == [0] &&
-  run [2017] primecheck == [1]
+  run [2017] primecheck == [1] &&
+  run [] "while(((v0+v1)==2^4*5/(3+2)))do{if(v0<0)then{v0=1}else{v2=1}}|v0,v1" == [0,0]
 
 {-
 Types and atomic constituents
@@ -330,29 +331,16 @@ parseVariable s
   | head s == 'v'                     = Var (parseNum (tail s))
   | otherwise                         = error ("ill-formed variable: " ++ s)
 
--- parses a term
--- left-to-right evaluation: x+y*z => (x+y)*z
 parseTerm :: String -> Term
-parseTerm s
-  | s == ""                           = error "empty term!"
-  | hasOuterPar s                     = parseTerm (init (tail s))
-  | tail parts == [] && head s == 'v' = VarT (parseVariable s)
-  | tail parts == []                  = Integ (parseNum s)
-  | otherwise                         = parseOpSeq parts []
-  where
-    parts :: [String]
-    parts = splitAtDelimitersN s opStrings ("(",")")
-    parseOpSeq :: [String]-> [String] -> Term
-    parseOpSeq leftParts rightParts
-      | rightParts == [] && tail leftParts == []  = parseTerm (head leftParts)
-      | rightParts == []                          = parseOpSeq (init (init leftParts)) [last (init leftParts), last leftParts]
-      | minPrec (head rightParts) leftParts       = (op (head rightParts)) (parseOpSeq leftParts []) (parseOpSeq (tail rightParts) [])
-      | otherwise                                 = parseOpSeq (init (init leftParts)) ([last (init  leftParts), last leftParts] ++ rightParts)
-    minPrec :: String -> [String] -> Bool
-    minPrec op parts
-      | tail parts == []                        = True
-      | opPrec (head (tail parts)) < opPrec op  = False
-      | otherwise                               = minPrec op (tail (tail parts))
+parseTerm s = termFromTree (createTree (splitAtOps s) [] opPrec) where
+  termFromTree :: StrTree -> Term
+  termFromTree (Leaf s)
+    | hasOuterPar s           = parseTerm (init (tail s))
+    | head s == 'v'           =  VarT (parseVariable s)
+    | otherwise               = Integ (parseNum s)
+  termFromTree (Node s t1 t2) = (op s) (termFromTree t1) (termFromTree t2)
+  splitAtOps :: String -> [String]
+  splitAtOps s = splitAtDelimitersN s opStrings ("(",")")
 
 -- parses a condition:
 -- "term1=term2"
@@ -535,6 +523,22 @@ splitAtDelimitersN s dels pars = splitAtDelAuxN s dels pars 0 "" where
   splitHead s (x:l)
     | beginsWith s x  = (drop (length x) s, x)
     | otherwise   = splitHead s l
+
+data StrTree = Leaf String | Node String StrTree StrTree deriving (Eq, Show)
+
+-- creates a tree from the list splitAtDelimitersN returns, and a function that
+-- precedence assigns precedence value to the delimiters.
+createTree :: [String] -> [String] -> (String -> Integer) -> StrTree
+createTree leftParts rightParts delPrec
+  | rightParts == [] && tail leftParts == []  = Leaf (head leftParts)
+  | rightParts == []                          = createTree (init (init leftParts)) [last (init leftParts), last leftParts] delPrec
+  | isLow (head rightParts) leftParts delPrec = (Node (head rightParts)) (createTree leftParts [] delPrec) (createTree (tail rightParts) [] delPrec)
+  | otherwise                                 = createTree (init (init leftParts)) ([last (init  leftParts), last leftParts] ++ rightParts) delPrec
+isLow :: String -> [String] -> (String -> Integer) -> Bool
+isLow del parts delPrec
+  | tail parts == []                          = True
+  | delPrec (head (tail parts)) < delPrec del = False
+  | otherwise                                 = isLow del (tail (tail parts)) delPrec
 
 -- checks whether a pair of parentheses surrounds a string:
 -- "(a(a)a)" => True
