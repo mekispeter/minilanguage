@@ -19,9 +19,9 @@ Commands in a command sequence are separated by semicolons.
 
 Variable names are nonnegative integer indices prefixed with a v: v0, v1, ....
 Terms are arithmetic expressions with integers, variables, and the operations
-{+,*,-,/,^}. The only supported data type is integer. Negative integers are
-not supported in the program strings, but can be the values of terms. / is
-integer division: 7/3 is 2.
+{+,*,-,/,^}. The only supported data type is integer. Negative integers have
+to be bracketed in the program strings: "3*(-2)" is parsed as "3*(0-2)", but
+"3*-2" is parsed as "(3*0)-2". '/' is integer division: "7/3" is evaluated as 2.
 
 Terms are parsed in a left-to-right fashion, with standard operator precedence
 (^ > *,/ > +,-): "11+9-3*2^3+5" is parsed into the same term as
@@ -48,9 +48,10 @@ loops (also an unpleasant way to go).
 The parser part is ugly. It works, but it has to be rewritten.
 
 ToDo:
-  - allow negative values at parsing
   - Boolean operators in conditions
-  - read program from file
+  - more liberal variable naming
+  - remarks
+  - reading program from file
   - make parser functions less ugly
 -}
 
@@ -162,7 +163,7 @@ test =
   run [30] divisors == [8] &&
   run [2019] primecheck == [0] &&
   run [2017] primecheck == [1] &&
-  run [] "while(((v0+v1)==2^4*5/(3+2)))do{if(v0<0)then{v0=1}else{v2=1}}|v0,v1" == [0,0]
+  run [] "while(((v0+-1)==2^4*5/(3+2)))do{if(v0<-7)then{v0=1}else{v2=1}}|v0,v1" == [0,0]
 
 {-
 Types and atomic constituents
@@ -267,6 +268,8 @@ assignParam (m:s) n g = assignUpdate (Var n,m) (assignParam s (n+1) g)
 -}
 
 -- evaluates a term
+-- division by zero and negative exponents are taken care of by Haskell's
+-- arithmetic module
 evalTerm :: Term -> Assign -> Integer
 evalTerm (VarT x) g   = g x
 evalTerm (Integ x) g  = x
@@ -318,13 +321,14 @@ run parameters progString = runPow parameters seqPart retPart initAssign where
 -- parses a numeral
 parseNum :: String -> Integer
 parseNum s
-  | s == ""                           = error "empty numeral!"
+  | s == ""                           = 0
   | not (all (`elem` "0123456789") s) = error ("ill-formed numeral: " ++ s)
   | s == "0"                          = 0
   | head s == '0'                     = error ("ill-formed numeral: " ++ s)
   | otherwise                         = read s :: Integer
 
 -- parses a variable
+-- "v0", "v12"
 parseVariable :: String -> Variable
 parseVariable s
   | s == "" || tail s == ""           = error ("ill-formed variablel: " ++ s)
@@ -336,6 +340,7 @@ parseTerm s = termFromTree (createTree (splitAtOps s) [] opPrec) where
   termFromTree :: StrTree -> Term
   termFromTree (Leaf s)
     | hasOuterPar s           = parseTerm (init (tail s))
+    | s == ""                 = Integ 0
     | head s == 'v'           =  VarT (parseVariable s)
     | otherwise               = Integ (parseNum s)
   termFromTree (Node s t1 t2) = (op s) (termFromTree t1) (termFromTree t2)
@@ -343,8 +348,7 @@ parseTerm s = termFromTree (createTree (splitAtOps s) [] opPrec) where
   splitAtOps s = splitAtDelimitersN s opStrings ("(",")")
 
 -- parses a condition:
--- "term1=term2"
--- "term1<term2"
+-- "term1==term2", "term1<=term2", "term1!=term2", s"term1<term2"
 parseCond :: String -> Condition
 parseCond s
   | s == ""                 = error "empty condition!"
