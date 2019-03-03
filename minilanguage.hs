@@ -1,62 +1,69 @@
 {-
-This program parses and runs programs written in an imperative minilanguage
-with very limited syntax. It supports simple control flow, if-then-else and
-while-do loops.
+  This program parses and runs programs written in an imperative minilanguage
+  with very limited syntax. It supports simple control flow, if-then-else and
+  while-do loops.
 
-Every program has the form 'comm1;comm2;...|vi1,vi2,...', where
-'comm1;comm2,...' is a sequence of commands, and vi1, vi2, ... is a list of
-variables. Commands are either of three kinds:
-- simple variable assignments of the form 'vn = t', where vn is a variable,
-  and t is a term;
-- while loops of the form 'while(cond)do[seq]', where cond is a condition,
-  and seq is a command sequence (parenthising the condition is optional),
-- if constructs of the form 'if(cond)then{seq1}else{seq2}', where cond is a
-  condition, and seq1 and seq2 are command sequences (parenthising the
-  condition is optional).
-Conditions consist of two terms related by '=' or '<', optionally
-parenthesized. The variable list at the end of the program is comma separated.
-Commands in a command sequence are separated by semicolons.
+  Every program has the form 'comm1;comm2;...|vi1,vi2,...', where
+  'comm1;comm2,...' is a sequence of commands, and vi1, vi2, ... is a list of
+  variables. Commands are either of three kinds:
+  - simple variable assignments of the form 'vn = t', where vn is a variable,
+    and t is a term;
+  - while loops of the form 'while(cond)do[seq]', where cond is a condition,
+    and seq is a command sequence (parenthising the condition is optional),
+  - if constructs of the form 'if(cond)then{seq1}else{seq2}', where cond is a
+    condition, and seq1 and seq2 are command sequences (parenthising the
+    condition is optional).
 
-Variable names are nonnegative integer indices prefixed with a v: v0, v1, ....
-Terms are arithmetic expressions with integers, variables, and the operations
-{+,*,-,/,^}. The only supported data type is integer. Negative integers have
-to be bracketed in the program strings: "3*(-2)" is parsed as "3*(0-2)", but
-"3*-2" is parsed as "(3*0)-2". '/' is integer division: "7/3" is evaluated as 2.
+  Conditions are
+  - one of the Boolean values true and false
+  - two terms related by "==", "!=", "<=", "<", "=>", or ">", optionally
+    parenthesized
+  - Boolean operations of conditions: "and", "or", "xor", "nand", and "nor".
 
-Terms are parsed in a left-to-right fashion, with standard operator precedence
-(^ > *,/ > +,-): "11+9-3*2^3+5" is parsed into the same term as
-"((11+(9-(3*(2^3))))+5)".
+  The variable list at the end of the program is comma separated.
 
-Programs can be run by calling the 'run' function. Its type is
-[Integer] -> String -> [Integer]. The first argument is an integer list
-[n0,...,nk] that assigns values to an initial segment of the variable list:
-ni is assigned to the variable vi. 'run [1,2] progstr' thus runs progstr with
-v0=1 and v1=2. The rest of the variables are assigned zero until changed at
-runtime by an assignment command.
+  Commands in a command sequence are separated by semicolons.
 
-The variable list at the end of a program specifies which variables' values
-will be printed after execution.
+  Variable names are nonnegative integer indices prefixed with a v: v0, v1, ....
+  Terms are arithmetic expressions with integers, variables, and the operations
+  {+,*,-,/,^}. The only supported data type is integer. Negative integers have
+  to be bracketed in the program strings: "3*(-2)" is parsed as "3*(0-2)", but
+  "3*-2" is parsed as "(3*0)-2". '/' is integer division: "7/3" is evaluated
+  as 2.
 
-Whitespace (space, tab, line break) is allowed anywhere in the code, and is
-ignored.
+  Terms are parsed in a left-to-right fashion, with standard operator precedence
+  (^ > *,/ > +,-): "11+9-3*2^3+5" is parsed into the same term as
+  "((11+(9-(3*(2^3))))+5)".
 
-The language is Turing complete. In principle lists and strings can be
-simulated via Gödel encodings, but that is a an unpleasant way to go. In fact,
-even if-then-else constructs are redundant; they can be simulated by while
-loops (also an unpleasant way to go).
+  Programs can be run by calling the 'run' function. Its type is
+  [Integer] -> String -> [Integer]. The first argument is an integer list
+  [n0,...,nk] that assigns values to an initial segment of the variable list:
+  ni is assigned to the variable vi. 'run [1,2] progstr' thus runs progstr with
+  v0=1 and v1=2. The rest of the variables are assigned zero until changed at
+  runtime by an assignment command.
 
-The parser part is ugly. It works, but it has to be rewritten.
+  The variable list at the end of a program specifies which variables' values
+  will be printed after execution.
 
-ToDo:
-  - Boolean operators in conditions
-  - more liberal variable naming
-  - remarks
-  - reading program from file
-  - make parser functions less ugly
+  Whitespace (space, tab, line break) is allowed anywhere in the code, and is
+  ignored.
+
+  The language is Turing complete. In principle lists and strings can be
+  simulated via Gödel encodings, but that is a an unpleasant way to go. In fact,
+  even if-then-else constructs are redundant; they can be simulated by while
+  loops (also an unpleasant way to go).
+
+  The parser part is ugly. It works, but it has to be rewritten.
+
+  ToDo:
+    - more liberal variable naming
+    - remarks
+    - reading program from file
+    - make parser functions slightly less ugly
 -}
 
 {-
-Add few programs written in the minilanguage
+A few programs written in the minilanguage
 -}
 
 -- n mod m. Eg. for n=27, m=12:
@@ -181,12 +188,18 @@ data Variable   = Var Integer deriving (Eq, Show)
 -- sequence of commands transforms one variable assignment into another.
 type Assign     = Variable -> Integer
 -- Four relations are supported in conditions: ==, <=, <, and !=.
-data Condition  = Equ Term Term | Leq Term Term |
-                  Less Term Term | Neq Term Term
+data Condition  = TrueC | FalseC |
+                  Equ Term Term | Neq Term Term |
+                  Leq Term Term | Less Term Term |
+                  Geq Term Term | Gtr Term Term |
+                  And Condition Condition | Or Condition Condition |
+                  Nand Condition Condition | Nor Condition Condition |
+                  Xor Condition Condition
                   deriving (Eq, Show)
 type Relation   = Term -> Term -> Condition
 -- Commands are either variable assignments, while-do loops, or if-then-else
 -- constructs.
+type BoolOp     = Condition -> Condition -> Condition
 data Command    = Let Variable Term |
                   While Condition Sequence |
                   If Condition Sequence Sequence
@@ -222,16 +235,45 @@ opPrec "/"  = 1
 opPrec "^"  = 2
 opPrec s    = error ("wrong operator: " ++ s)
 
-relStrings = ["==","<=","<","!="]
+relStrings = ["==","!=","<=","<","=>",">"]
 rel :: String -> Relation
 rel "=="  = Equ
+rel "!="  = Neq
 rel "<="  = Leq
 rel "<"   = Less
-rel "!="  = Neq
+rel "=>"  = Geq
+rel ">"   = Gtr
 rel s     = error ("wrong relation symbol: " ++ s)
 
 rels :: [Relation]
 rels = map rel relStrings
+
+boolOpStrings :: [String]
+boolOpStrings = ["and", "or", "nand", "nor", "xor"]
+boolOp :: String -> BoolOp
+boolOp "and"  = And
+boolOp "or"   = Or
+boolOp "nand" = Nand
+boolOp "nor"  = Nor
+boolOp "xor"  = Xor
+boolOp s      = error ("wrong Boolean operator: " ++ s)
+boolOps = map boolOp boolOpStrings
+
+-- Boolean operator precedence: ^ > *,/ > +,-
+boolOpPrec :: String -> Integer
+boolOpPrec "and"    = 2
+boolOpPrec "or"     = 1
+boolOpPrec "nand-"  = 0
+boolOpPrec "nor"    = 0
+boolOpPrec "xor"    = 3
+boolOpPrec s        = error ("wrong Boolean operator: " ++ s)
+
+boolStrings :: [String]
+boolStrings = ["true", "false"]
+bool :: String -> Condition
+bool "true" = TrueC
+bool "false" = FalseC
+bools = map bool boolStrings
 
 var :: String -> Variable
 var (c:s)
@@ -281,10 +323,19 @@ evalTerm (Pow x y) g  = evalTerm x g ^ evalTerm y g
 
 -- evaluates a condition
 evalCond :: Condition -> Assign -> Bool
+evalCond (TrueC) g      = True
+evalCond (FalseC) g     = False
 evalCond (Equ t t') g   = evalTerm t g == evalTerm t' g
+evalCond (Neq t t') g   = evalTerm t g /= evalTerm t' g
 evalCond (Leq t t') g   = evalTerm t g <= evalTerm t' g
 evalCond (Less t t') g  = evalTerm t g < evalTerm t' g
-evalCond (Neq t t') g   = evalTerm t g /= evalTerm t' g
+evalCond (Geq t t') g   = evalTerm t g >= evalTerm t' g
+evalCond (Gtr t t') g  = evalTerm t g > evalTerm t' g
+evalCond (And c c') g   = evalCond c g && evalCond c' g
+evalCond (Or c c') g    = evalCond c g || evalCond c' g
+evalCond (Nand c c') g  = not (evalCond c g && evalCond c' g)
+evalCond (Nor c c') g   = not (evalCond c g || evalCond c' g)
+evalCond (Xor c c') g   = evalCond c g /= evalCond c' g
 
 -- evaluates a command
 evalComm :: Command -> Assign -> Assign
@@ -349,10 +400,10 @@ parseTerm s = termFromTree (createTree (splitAtOps s) [] opPrec) where
 
 -- parses a condition:
 -- "term1==term2", "term1<=term2", "term1!=term2", s"term1<term2"
-parseCond :: String -> Condition
-parseCond s
+parseRel :: String -> Condition
+parseRel s
   | s == ""                 = error "empty condition!"
-  | hasOuterPar s           = parseCond (init (tail s))
+  | hasOuterPar s           = parseRel (init (tail s))
   | tail (fst parts) == []  = error ("ill-formed condition: " ++ s)
   | tail (snd parts) /= []  = error ("ill-formed condition: " ++ s)
   | otherwise = rel relPart (parseTerm leftPart) (parseTerm rightPart)
@@ -361,6 +412,18 @@ parseCond s
     leftPart = head (fst parts)
     rightPart = head (tail (fst parts))
     relPart = head (snd parts)
+
+parseCond :: String -> Condition
+parseCond s = condFromTree (createTree (splitAtBoolOps s) [] boolOpPrec) where
+  condFromTree :: StrTree -> Condition
+  condFromTree (Leaf s)
+    | hasOuterPar s           = parseCond (init (tail s))
+    | s == "true"             = TrueC
+    | s == "false"            = FalseC
+    | otherwise               = parseRel s
+  condFromTree (Node s t1 t2) = (boolOp s) (condFromTree t1) (condFromTree t2)
+  splitAtBoolOps :: String -> [String]
+  splitAtBoolOps s = splitAtDelimitersN s boolOpStrings ("(",")")
 
 -- parses a command commands can be:
 -- "vi = term"
@@ -442,6 +505,14 @@ parseProg s
   String manipulation functions for parsing
 -}
 
+beginsWith :: String -> String -> Bool
+beginsWith s1 s2
+  | s2 == ""            = True
+  | s1 == ""            = False
+  | head s1 == head s2  = beginsWith (tail s1) (tail s2)
+  | otherwise           = False
+
+
 {-
   Splits a string at any of the delimiters in the delimiter list at the top
   level wrt the parentheses in the parentheses list.
@@ -475,12 +546,6 @@ splitAtDelimiters s del_l par_l = splitAtDelAux s del_l par_l 0 [] [] "" where
     | (head s) `elem` (snd par_l)         = splitAtDelAux (tail s) del_l par_l (n-1) parts delimiters (currentpart ++ [head s])
     | any (beginsWith s) del_l && n == 0  = splitAtDelAux (fst (splitHead s del_l)) del_l par_l n (parts ++ [currentpart]) (delimiters ++ [snd (splitHead s del_l)]) ""
     | otherwise                           = splitAtDelAux (tail s) del_l par_l n parts delimiters (currentpart ++ [head s])
-  beginsWith :: String -> String -> Bool
-  beginsWith s1 s2
-    | s2 == ""            = True
-    | s1 == ""            = False
-    | head s1 == head s2  = beginsWith (tail s1) (tail s2)
-    | otherwise           = False
   splitHead :: String -> [String] -> (String, String)
   splitHead s []  = (s, "")
   splitHead s (x:l)
@@ -490,7 +555,7 @@ splitAtDelimiters s del_l par_l = splitAtDelAux s del_l par_l 0 [] [] "" where
 {-
   Does the same as the previous one, except it returns a single list:
   examples:
-    > splitAtDelimitersN "a|b|c" ["|"] ("(",")")
+----    > splitAtDelimitersN "a|b|c" ["|"] ("(",")")
     ["a","|","b","|","c"]
     > splitAtDelimitersN "a|(b|c)" ["|"] ("(",")")
     ["a","|","(b|c)"]
@@ -516,12 +581,6 @@ splitAtDelimitersN s dels pars = splitAtDelAuxN s dels pars 0 "" where
     | (head s) `elem` (snd pars)            = splitAtDelAuxN (tail s) dels pars (depth-1) (currentpart ++ [head s])
     | any (beginsWith s) dels && depth == 0 = currentpart : ((snd (splitHead s dels)) : (splitAtDelAuxN (fst (splitHead s dels)) dels pars depth ""))
     | otherwise                             = splitAtDelAuxN (tail s) dels pars depth (currentpart ++ [head s])
-  beginsWith :: String -> String -> Bool
-  beginsWith s1 s2
-    | s2 == ""            = True
-    | s1 == ""            = False
-    | head s1 == head s2  = beginsWith (tail s1) (tail s2)
-    | otherwise           = False
   splitHead :: String -> [String] -> (String, String)
   splitHead s []  = (s, "")
   splitHead s (x:l)
