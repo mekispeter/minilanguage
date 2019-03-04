@@ -4,17 +4,18 @@ This is an exercise in Haskell. I'm trying to implement an imperative language, 
 
 The file contains a detailed description of how things are done. Here's a sample program in the language:
 
-    v1 = 1;
-    v2 = 0;
-    v3 = 1;
-    while v1 < v0 do {
-        v4 = v2 + v3;
-        v2 = v3;
-        v3 = v4;
-        v1 = v1 + 1
-    }   
-    | v3
-
+    n | # the value of n is passed as a parameter
+    i = 1;
+    fib_prev = 0;
+    fib = 1;
+    while i < n do {
+      fib_new = fib_prev + fib;
+      fib_prev = fib;         
+      fib = fib_new;                   
+      i = i + 1                    
+      }                           
+    | fib # the value of fib is returned after execution
+    
 This program calculates the nth Fibonacci number. It is included in the source file, and is named fibonacci. It can be run by typing "`run [n] fibonacci`" in ghci, where n is a nonnegative integer that will be assigned to `v0` before runtime. After execution, the value of `v3` will be the nth Fibonacci number, so this value is returned. 
 
 The source contains a few more samples.
