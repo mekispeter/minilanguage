@@ -16,6 +16,7 @@ The file contains a detailed description of how things are done. Here's a sample
       }                           
     | fib # the value of fib is returned after execution
     
-This program calculates the nth Fibonacci number. It is included in the source file, and is named fibonacci. It can be run by typing "`run [n] fibonacci`" in ghci, where n is a nonnegative integer that will be assigned to `v0` before runtime. After execution, the value of `v3` will be the nth Fibonacci number, so this value is returned. 
+This program calculates the nth Fibonacci number. It is included in the source file, and is named fibonacci. It can be run by typing "`run [n] fibonacci`" in ghci, where n is a nonnegative integer that will be assigned to the variable `n` before executing the program. After execution, the value of `fib` will be the nth Fibonacci number, and this value is returned in a string: `"fib:55"`.
+
 
 The source contains a few more samples.
